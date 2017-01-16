@@ -13,4 +13,6 @@ go get github.com/stoyaneft/chat-app
 go run main.go
 ```
 
-Then point your browser to [link](localhost:8001)
+Then point your browser to [localhost:8001](localhost:8001)
+
+This project is under GNU GENERAL PUBLIC LICENSE.
