@@ -62,7 +62,8 @@ new Vue({
             this.ws.send(JSON.stringify({
                 email: this.email,
                 username: this.username,
-                password: this.password
+                password: this.password,
+                type: 'authentication'
             }));
         },
 

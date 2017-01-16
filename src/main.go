@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/stoyaneft/chat-app/src/db"
 )
 
 var clients = make(map[*websocket.Conn]bool) // connected clients
@@ -12,6 +13,7 @@ var broadcast = make(chan Message)           // broadcast channel
 
 // Configure the upgrader
 var upgrader = websocket.Upgrader{}
+var dbx = &db.Db{}
 
 // Define our message object
 type Message struct {
@@ -19,6 +21,7 @@ type Message struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Message  string `json:"message"`
+	Type string `json:"type"`
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +53,7 @@ func handleMessages() {
 		// Grab the next message from the broadcast channel
 		msg := <-broadcast
 
-		if (msg.Message != "") {
+		if (msg.Type != "authentication") {
 			// Send it out to every client that is currently connected
 			for client := range clients {
 				err := client.WriteJSON(msg)
@@ -60,16 +63,22 @@ func handleMessages() {
 					delete(clients, client)
 				}
 			}
+		} else {
+			user := db.User{Username: msg.Username, Email: msg.Email, Password: msg.Password}
+			// user := db.User{Username: "tosho_sexa",Email: "chocho@gmail.com",Password: "sex_bog99"}
+			log.Println(user)
+			err := dbx.Insert(user)
+			log.Println(err)
 		}
 	}
 }
 
 func main() {
-	// Create a simple file server
 	fs := http.FileServer(http.Dir("../public"))
 	http.Handle("/", fs)
 	// Configure websocket route
 	http.HandleFunc("/ws", handleConnections)
+	dbx.Init()
 
 	// Start listening for incoming chat messages
 	go handleMessages()
@@ -79,4 +88,7 @@ func main() {
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
+	// db := &db.Db{}
+	// db.Insert(User{})
+
 }
