@@ -64,13 +64,23 @@ func handleMessages() {
 				}
 			}
 		} else {
+			validateCredentials(msg)
 			user := db.User{Username: msg.Username, Email: msg.Email, Password: msg.Password}
-			// user := db.User{Username: "tosho_sexa",Email: "chocho@gmail.com",Password: "sex_bog99"}
-			log.Println(user)
 			err := dbx.Insert(user)
-			log.Println(err)
+			checkErr(err, "Insertion error")
 		}
 	}
+}
+
+// Validates user credentials
+func validateCredentials(msg) {
+ 	return true
+}
+
+func checkErr(err error, msg string) {
+    if err != nil {
+        log.Fatalln(msg, err)
+    }
 }
 
 func main() {

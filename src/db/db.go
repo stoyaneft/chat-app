@@ -15,6 +15,23 @@ type User struct {
     Password   string
 }
 
+type UserChats struct {
+	UserId int64
+	ChatId int64
+}
+
+type Chat struct {
+	Id int64
+	Name string
+}
+
+type ChatMessage struct {
+	UserId int64
+	ChatId int64
+	Message string
+	CreatedAt int64
+}
+
 type Db struct { dbmap *gorp.DbMap }
 
 func (db *Db) Init() {
@@ -26,12 +43,9 @@ func (db *Db) Init() {
 
 	 err = db.dbmap.CreateTablesIfNotExists()
 	 checkErr(err, "Create tables failed")
-
-	//  return dbmap
 }
 
 func (db *Db) Insert(user User) error {
-	// log.Println(*user)
 	err := db.dbmap.Insert(&user);
 	return err
 }
@@ -41,13 +55,3 @@ func checkErr(err error, msg string) {
         log.Fatalln(msg, err)
     }
 }
-
-// func main() {
-// 	// dbmap := Init()
-// 	db := &Db{}
-// 	db.Init()
-// 	defer db.dbmap.Db.Close()
-// 	chocho := &User{Username: "goocho_sexa",Email: "chocho@gmail.com",Password: "sex_bog99"}
-// 	err := db.Insert(chocho);
-// 	checkErr(err, "Insertion failed")
-// }
