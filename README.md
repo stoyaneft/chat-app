@@ -8,7 +8,6 @@ and Materialize are used. It has the following features:
 
 To run the application just run the following:
 ```
-cd ./src
 go get github.com/stoyaneft/chat-app
 go run main.go
 ```
