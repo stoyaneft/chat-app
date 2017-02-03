@@ -15,14 +15,13 @@
     <nav>
         <div class="nav-wrapper">
             <a href="/" class="brand-logo right">Simple Chat</a>
-            <ul id="nav-mobile" class="left">
-                <li><a href="login">Login</a></li>
+			<ul id="nav-mobile" class="left">
+                <li><a href="/">Register</a></li>
             </ul>
         </div>
-
     </nav>
 </header>
-<main id="index">
+<main id="login">
     <div class="row" v-if="joined">
         <div class="col s12">
             <div class="card horizontal">
@@ -44,22 +43,19 @@
     </div>
     <div class="container row" v-if="!joined">
         <div class="row">
-            <h2 class="center-align">Create an account</h2>
+            <h2 class="center-align">Login</h2>
         </div>
         <div class="input-field col s6 offset-s3">
-            <input type="text" v-model.trim="username" placeholder="Username" @keyup.enter="join()">
+            <input type="text" v-model.trim="username" placeholder="Username" @keyup.enter="login()">
         </div>
         <div class="input-field col s6 offset-s3">
-            <input type="password" v-model="password" placeholder="Password" @keyup.enter="join()">
-        </div>
-        <div class="input-field col s6 offset-s3">
-            <input type="email" v-model.trim="email" placeholder="Email" @keyup.enter="join()">
+            <input type="password" v-model="password" placeholder="Password" @keyup.enter="login()">
         </div>
 
         <div class="input-field col s4 offset-s5">
-            <button class="waves-effect waves-light btn" @click="join()">
+            <button class="waves-effect waves-light btn" @click="login()">
                 <i class="material-icons right">done</i>
-                Join
+                Login
             </button>
         </div>
     </div>
@@ -71,6 +67,6 @@
 <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/rollups/md5.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.8/js/materialize.min.js"></script>
-<script src="/index.js"></script>
+<script src="/login.js"></script>
 </body>
 </html>

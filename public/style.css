@@ -14,3 +14,7 @@ main {
     width: 100%;
     overflow-y: scroll;
 }
+
+#nav-mobile {
+    margin-left: 10px;
+}

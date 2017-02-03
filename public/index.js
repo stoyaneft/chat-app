@@ -1,5 +1,5 @@
 new Vue({
-    el: '#app',
+    el: '#index',
 
     data: {
         ws: null, // Our websocket
@@ -16,14 +16,23 @@ new Vue({
         this.ws = new WebSocket('ws://' + window.location.host + '/ws');
         this.ws.addEventListener('message', function(e) {
             var msg = JSON.parse(e.data);
-            self.chatContent += '<div class="chip">'
-                    + '<img src="' + self.gravatarURL(msg.email) + '">' // Avatar
-                    + msg.username
-                + '</div>'
-                + emojione.toImage(msg.message) + '<br/>'; // Parse emojis
+            console.log('msg ', msg)
+            if (msg.type == 'error') {
+                Materialize.toast(msg.message, 2000);
+            }
+            if (msg.type == 'registrationSuccessful') {
+                self.onRegistrationSuccessful();
+            }
+            if (this.joined && msg.type == 'message') {
+                self.chatContent += '<div class="chip">'
+                        + '<img src="' + self.gravatarURL(msg.email) + '">' // Avatar
+                        + msg.username
+                    + '</div>'
+                    + emojione.toImage(msg.message) + '<br/>'; // Parse emojis
 
-            var element = document.getElementById('chat-messages');
-            element.scrollTop = element.scrollHeight; // Auto scroll to the bottom
+                var element = document.getElementById('chat-messages');
+                element.scrollTop = element.scrollHeight; // Auto scroll to the bottom
+            }
         });
     },
 
@@ -57,14 +66,17 @@ new Vue({
             this.email = $('<p>').html(this.email).text();
             this.username = $('<p>').html(this.username).text();
             this.password = $('<p>').html(this.password).text();
-            this.joined = true;
+            // this.joined = true;
 
             this.ws.send(JSON.stringify({
                 email: this.email,
                 username: this.username,
                 password: this.password,
-                type: 'authentication'
+                type: 'registration'
             }));
+        },
+        onRegistrationSuccessful: function() {
+            this.joined = true;
         },
 
         gravatarURL: function(email) {
