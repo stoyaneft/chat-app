@@ -1,3 +1,13 @@
+Vue.component('chat-item', {
+        props: ['chatUid'],
+        template: '<li>{{ chatUid }}</li>',
+});
+
+Vue.component('chat-item', {
+  props: ['id'],
+  template: '<li>{{ id }}</li>'
+})
+
 new Vue({
     el: '#login',
 
@@ -8,10 +18,15 @@ new Vue({
         email: null, // Email address used for grabbing an avatar
         username: null, // Our username
         password: null,
-        joined: false // True if email and username have been filled in
+        joined: false, // True if email and username have been filled in
+        chatUids: [9, 10],
+        chats: new Map(/*chatId: members*/),
+        addedUser: '',
+        activeChat: null,
     },
 
     created: function() {
+         $(".button-collapse").sideNav();
         var self = this;
         this.ws = new WebSocket('ws://' + window.location.host + '/ws');
         this.ws.addEventListener('message', function(e) {
@@ -22,6 +37,9 @@ new Vue({
             }
             if (msg.type == 'loginSuccessful') {
                 self.onLoginSuccessful();
+            }
+            if (msg.type == 'chatCreationSuccessful') {
+                self.onChatCreationSuccessful(msg.chatUid);
             }
             if (this.joined && msg.type == 'message') {
                 self.chatContent += '<div class="chip">'
@@ -71,6 +89,17 @@ new Vue({
         },
         onLoginSuccessful: function() {
             this.joined = true;
+        },
+        createChat: function() {
+            this.ws.send(JSON.stringify({
+                type: 'createChat'
+            }));
+        },
+        onChatCreationSuccessful: function(chatUid) {
+            this.chats.set(chatUid, []);
+            this.chatUids.push(chatUid);
+            this.activeChat = chatUid;
+            console.log(this.chatUids)
         },
 
         gravatarURL: function(email) {

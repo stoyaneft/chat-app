@@ -17,12 +17,15 @@ new Vue({
         this.ws.addEventListener('message', function(e) {
             var msg = JSON.parse(e.data);
             console.log('msg ', msg)
-            if (msg.type == 'error') {
-                Materialize.toast(msg.message, 2000);
+            switch (msg.type) {
+                case 'error':
+                    Materialize.toast(msg.message, 2000);
+                    break;
+                case 'registrationSuccessful':
+                    self.onRegistrationSuccessful();
+                    break;
             }
-            if (msg.type == 'registrationSuccessful') {
-                self.onRegistrationSuccessful();
-            }
+
             if (this.joined && msg.type == 'message') {
                 self.chatContent += '<div class="chip">'
                         + '<img src="' + self.gravatarURL(msg.email) + '">' // Avatar

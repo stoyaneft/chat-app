@@ -5,13 +5,14 @@ import (
 	"net/http"
 	"io/ioutil"
 
+	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 	"github.com/gorilla/websocket"
 	"github.com/stoyaneft/chat-app/db"
 )
 
 type Chat struct {
-	Id int64
+	Uid string
 	Users map[*User]bool
 	BroadcastQueue chan Message
 }
@@ -22,8 +23,9 @@ type User struct {
 	Ws *websocket.Conn
 }
 
-var chats = make(map[int64]*Chat) // {chatId: Chat}
-var clients = make(map[string]*websocket.Conn) // {username: conn}
+var chats = make(map[string]Chat) // {chatUid: Chat}
+var clients = make(map[*websocket.Conn]string) // {username: conn}
+var userChats = make(map[*websocket.Conn]string)
 // var clients = make(map[*websocket.Conn]bool) // connected clients
 // var broadcast = make(chan Message)           // broadcast channel
 
@@ -38,6 +40,7 @@ type Message struct {
 	Password string `json:"password"`
 	Message  string `json:"message"`
 	Type string `json:"type"`
+	ChatUid string `json:"chatUid"`
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +63,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 		switch msg.Type {
 			case "registration":
-				clients[msg.Username] = ws
+				clients[ws] = msg.Username
 				hashedPassword, err := bcrypt.GenerateFromPassword([]byte(msg.Password), bcrypt.DefaultCost)
 				checkErr(err, "EncryptionError")
 				user := db.User{
@@ -69,16 +72,16 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 					Password: hashedPassword,
 				}
 				log.Println("inserted ", user);
-				err = dbx.Insert(user)
+				err = dbx.InsertUser(user)
 				if (err != nil) {
 					ws.WriteJSON(Message{Type: "error", Message: "User already exists"})
 				} else {
 					ws.WriteJSON(Message{Type: "registrationSuccessful"})
 				}
 			case "login":
-				clients[msg.Username] = ws
+				clients[ws] = msg.Username
 				log.Println("logging ", msg)
-				user, err := dbx.Select("select * from users where username=?", msg.Username)
+				user, err := dbx.SelectUser("select * from users where username=?", msg.Username)
 				log.Println(user)
 				if (err != nil) {
 					ws.WriteJSON(Message{Type: "error", Message: "Username does not exist"})
@@ -90,6 +93,37 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 						log.Println("loginSuccessful")
 						ws.WriteJSON(Message{Type: "loginSuccessful"})
 					}
+				}
+			case "createChat":
+				username := clients[ws]
+				user, err := dbx.SelectUser("select * from users where username=?", username)
+				chatUid := uuid.NewV4().String()
+				log.Println(chatUid)
+				userChat := db.UserChat{
+					UserId: user.Id,
+					ChatUid: chatUid,
+				}
+				err = dbx.InsertUserChat(userChat)
+
+				checkErr(err, "opa")
+				log.Println(user)
+				userChats[ws] = chatUid
+				usersMap := make(map[*User]bool)
+				u := User{
+					Username: username,
+					Ws: ws,
+				}
+				usersMap[&u] = true
+				chats[chatUid] = Chat{
+					Users: usersMap,
+					BroadcastQueue: make(chan Message),
+				}
+				if (err != nil) {
+					log.Println(err)
+					ws.WriteJSON(Message{Type: "error", Message: "Could not create chat"})
+				} else {
+					log.Println("chatCreationSuccessful")
+					ws.WriteJSON(Message{Type: "chatCreationSuccessful", ChatUid: chatUid})
 				}
 
 			// default:
