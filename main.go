@@ -13,21 +13,12 @@ import (
 
 type Chat struct {
 	Uid string
-	Users map[*User]bool
+	Users map[*websocket.Conn]bool
 	BroadcastQueue chan Message
 }
 
-type User struct {
-	Username string
-	Password string
-	Ws *websocket.Conn
-}
-
 var chats = make(map[string]Chat) // {chatUid: Chat}
-var clients = make(map[*websocket.Conn]string) // {username: conn}
-var userChats = make(map[*websocket.Conn]string)
-// var clients = make(map[*websocket.Conn]bool) // connected clients
-// var broadcast = make(chan Message)           // broadcast channel
+var users = make(map[string]*websocket.Conn);
 
 // Configure the upgrader
 var upgrader = websocket.Upgrader{}
@@ -64,7 +55,6 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 		switch msg.Type {
 		case "registration":
-			clients[ws] = msg.Username
 			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(msg.Password), bcrypt.DefaultCost)
 			checkErr(err, "EncryptionError")
 			user := db.User{
@@ -80,7 +70,6 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				ws.WriteJSON(Message{Type: "registrationSuccessful"})
 			}
 		case "login":
-			clients[ws] = msg.Username
 			log.Println("logging ", msg)
 			user, err := dbx.SelectUser("select * from users where username=?", msg.Username)
 			log.Println(user)
@@ -92,11 +81,12 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 					ws.WriteJSON(Message{Type: "error", Message: "Wrong password"})
 				} else {
 					log.Println("loginSuccessful")
+					users[msg.Username] = ws;
 					ws.WriteJSON(Message{Type: "loginSuccessful"})
 				}
 			}
 		case "createChat":
-			username := clients[ws]
+			username := msg.Username
 			user, err := dbx.SelectUser("select * from users where username=?", username)
 			chatUid := uuid.NewV4().String()
 			log.Println(chatUid)
@@ -106,17 +96,10 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			}
 			err = dbx.InsertUserChat(userChat)
 
-			checkErr(err, "opa")
+			checkErr(err, "Insertion user chat error");
 			log.Println(user)
-			userChats[ws] = chatUid
-			usersMap := make(map[*User]bool)
-			u := User{
-				Username: username,
-				Ws: ws,
-			}
-			usersMap[&u] = true
 			chats[chatUid] = Chat{
-				Users: usersMap,
+				Users: map[*websocket.Conn]bool{ws: true},
 				BroadcastQueue: make(chan Message),
 			}
 			if (err != nil) {
@@ -126,66 +109,51 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				log.Println("chatCreationSuccessful")
 				ws.WriteJSON(Message{Type: "chatCreationSuccessful", ChatUid: chatUid})
 			}
-		 case "chatSelection":
+			go handleMessages(chatUid);
+		case "chatSelection":
+			 log.Println("selection msg", msg)
 		 	usersInChat, err := dbx.SelectUsersByChat(msg.ChatUid)
 			checkErr(err, "Chat selection error")
 		 	log.Println("chat Participatnts", usersInChat)
 			ws.WriteJSON(Message{Type: "chatSelectionSuccessful", Participants: usersInChat, ChatUid: msg.ChatUid})
-		//
-		// // default:
-		// // 	for client := range clients {
-		// // 		err := client.Ws.WriteJSON(msg)
-		// // 		if err != nil {
-		// // 			log.Printf("error: %v", err)
-		// // 			client.Close()
-		// // 			delete(clients, client)
-		// // 		}
-		// // 	}
-		// }
-		// Send the newly received message to the broadcast channel
+		case "addUser":
+			user, err := dbx.SelectUser("select * from users where username=?", msg.Username)
+			if (err != nil) {
+				log.Println(err)
+				ws.WriteJSON(Message{Type: "error", Message: "User does not exist"})
+				continue
+			}
+			userChat := db.UserChat{
+				UserId: user.Id,
+				ChatUid: msg.ChatUid,
+			}
+			err = dbx.InsertUserChat(userChat)
+			checkErr(err, "Insertion user chat error");
+			ws.WriteJSON(Message{Type: "userAddedSuccessful", Username: user.Username})
+			log.Println("Added user ", user);
+			chats[msg.ChatUid].Users[users[msg.Username]] = true
+		case "sendMessage":
+			log.Println("Received message", msg)
+			chats[msg.ChatUid].BroadcastQueue <- msg
 		}
 	}
 }
-
-// func handleMessages() {
-// 	for {
-// 		// Grab the next message from the broadcast channel
-// 		msg := <-broadcast
-//
-// 		switch msg.Type {
-// 		case "registration":
-// 			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(msg.Password), bcrypt.DefaultCost)
-// 			checkErr(err, "EncryptionError")
-// 			user := db.User{
-// 				Username: msg.Username,
-// 				Email: msg.Email,
-// 				Password: hashedPassword,
-// 			}
-// 			err = dbx.Insert(user)
-// 			checkErr(err, "Insertion error")
-// 		case "authentication":
-//
-//
-// 		default:
-// 			for client := range clients {
-// 				err := client.Ws.WriteJSON(msg)
-// 				if err != nil {
-// 					log.Printf("error: %v", err)
-// 					client.Close()
-// 					delete(clients, client)
-// 				}
-// 			}
-// 		}
-//
-// 		if (msg.Type != "authentication") {
-// 			// Send it out to every client that is currently connected
-//
-// 		} else {
-// 			// validateCredentials(msg)
-//
-// 		}
-// 	}
-// }
+func handleMessages(chatUid string) {
+	chat := chats[chatUid]
+	for msg := range chat.BroadcastQueue {
+		log.Println("opaaaa", msg)
+		// Grab the next message from the broadcast channel
+		for user := range chat.Users {
+			err := user.WriteJSON(msg)
+			if err != nil {
+				log.Printf("error: %v", err)
+				user.Close()
+				delete(chat.Users, user)
+			}
+			log.Println("Message sent")
+		}
+	}
+}
 
 func loadPage(filename string) ([]byte, error) {
     body, err := ioutil.ReadFile(filename)

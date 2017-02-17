@@ -1,3 +1,4 @@
+'use strict';
 
 new Vue({
     el: '#login',
@@ -38,15 +39,11 @@ new Vue({
             if (msg.type == 'chatSelectionSuccessful') {
                 self.onChatSelectionSuccessful(msg.chatUid, msg.participants)
             }
-            if (this.joined && msg.type == 'message') {
-                self.chatContent += '<div class="chip">'
-                        + '<img src="' + self.gravatarURL(msg.email) + '">' // Avatar
-                        + msg.username
-                    + '</div>'
-                    + emojione.toImage(msg.message) + '<br/>'; // Parse emojis
-
-                var element = document.getElementById('chat-messages');
-                element.scrollTop = element.scrollHeight; // Auto scroll to the bottom
+            if (msg.type == 'userAddedSuccessful') {
+                self.onUserAddedSuccessful(msg.username);
+            }
+            if (msg.type == 'sendMessage') {
+                self.onSendMessage(msg);
             }
         });
     },
@@ -56,6 +53,7 @@ new Vue({
             if (this.newMsg != '') {
                 this.ws.send(
                     JSON.stringify({
+                        type: "sendMessage",
                         username: this.username,
                         message: $('<p>').html(this.newMsg).text(),
                         chatUid: this.activeChat.uid
@@ -88,7 +86,8 @@ new Vue({
         },
         createChat: function() {
             this.ws.send(JSON.stringify({
-                type: 'createChat'
+                type: 'createChat',
+                username: this.username
             }));
         },
         onChatCreationSuccessful: function(chatUid) {
@@ -104,10 +103,41 @@ new Vue({
             }))
         },
         onChatSelectionSuccessful: function(chatUid, participants) {
+            var otherMembers = participants.filter(p => p !== this.username);
+            console.log(otherMembers)
+            this.activeChat = { uid: chatUid, participants: otherMembers };
             this.chats.set(chatUid, participants);
-            this.activeChat = { uid: chatUid, participants: participants };
             console.log(this.chats)
-            console.log('active chat' , chatUid);
+            console.log('active chat' , this.activeChat);
+        },
+        addUser: function() {
+            console.log('adding');
+            console.log(this.addedUser);
+            if (this.activeChat.participants.indexOf(this.addedUser) !== -1 || this.addedUser === this.username) {
+                Materialize.toast(`The user ${this.addedUser} is already in the chat`, 2000);
+                return;
+            }
+            this.ws.send(JSON.stringify({
+                type: 'addUser',
+                username: this.addedUser,
+                chatUid: this.activeChat.uid
+            }));
+        },
+        onUserAddedSuccessful: function (addedUser) {
+            this.activeChat.participants.push(addedUser);
+            console.log(this.activeChat.participants);
+        },
+
+        onSendMessage: function (msg) {
+            console.log('received message ', msg);
+            this.chatContent += '<div class="chip">'
+                + '<img src="' + this.gravatarURL(msg.email) + '">' // Avatar
+                + msg.username
+                + '</div>'
+                + emojione.toImage(msg.message) + '<br/>'; // Parse emojis
+
+            var element = document.getElementById('chat-messages');
+            element.scrollTop = element.scrollHeight; // Auto scroll to the bottom
         },
 
         gravatarURL: function(email) {

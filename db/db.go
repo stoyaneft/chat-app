@@ -66,7 +66,7 @@ func (db *Db) InsertUserChat(userChat UserChat) error {
 
 func (db *Db) SelectUsersByChat(chatUid string) ([]string, error) {
 	var users []User
-	_, err := db.dbmap.Select(&users, "select users.Username from user_chats join users where chatUid=?", chatUid)
+	_, err := db.dbmap.Select(&users, "select users.Username from user_chats join users where users.Id=user_chats.UserId and chatUid=?", chatUid)
 	userIds := make([]string, len(users))
 	for idx, user := range(users) {
 		userIds[idx] = user.Username
