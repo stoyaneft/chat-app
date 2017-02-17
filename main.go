@@ -41,6 +41,7 @@ type Message struct {
 	Message  string `json:"message"`
 	Type string `json:"type"`
 	ChatUid string `json:"chatUid"`
+	Participants []string `json:"participants"`
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
@@ -62,81 +63,87 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		switch msg.Type {
-			case "registration":
-				clients[ws] = msg.Username
-				hashedPassword, err := bcrypt.GenerateFromPassword([]byte(msg.Password), bcrypt.DefaultCost)
-				checkErr(err, "EncryptionError")
-				user := db.User{
-					Username: msg.Username,
-					Email: msg.Email,
-					Password: hashedPassword,
-				}
-				log.Println("inserted ", user);
-				err = dbx.InsertUser(user)
-				if (err != nil) {
-					ws.WriteJSON(Message{Type: "error", Message: "User already exists"})
-				} else {
-					ws.WriteJSON(Message{Type: "registrationSuccessful"})
-				}
-			case "login":
-				clients[ws] = msg.Username
-				log.Println("logging ", msg)
-				user, err := dbx.SelectUser("select * from users where username=?", msg.Username)
-				log.Println(user)
-				if (err != nil) {
-					ws.WriteJSON(Message{Type: "error", Message: "Username does not exist"})
-				} else {
-					err = bcrypt.CompareHashAndPassword(user.Password, []byte(msg.Password))
-					if (err != nil) {
-						ws.WriteJSON(Message{Type: "error", Message: "Wrong password"})
-					} else {
-						log.Println("loginSuccessful")
-						ws.WriteJSON(Message{Type: "loginSuccessful"})
-					}
-				}
-			case "createChat":
-				username := clients[ws]
-				user, err := dbx.SelectUser("select * from users where username=?", username)
-				chatUid := uuid.NewV4().String()
-				log.Println(chatUid)
-				userChat := db.UserChat{
-					UserId: user.Id,
-					ChatUid: chatUid,
-				}
-				err = dbx.InsertUserChat(userChat)
-
-				checkErr(err, "opa")
-				log.Println(user)
-				userChats[ws] = chatUid
-				usersMap := make(map[*User]bool)
-				u := User{
-					Username: username,
-					Ws: ws,
-				}
-				usersMap[&u] = true
-				chats[chatUid] = Chat{
-					Users: usersMap,
-					BroadcastQueue: make(chan Message),
-				}
-				if (err != nil) {
-					log.Println(err)
-					ws.WriteJSON(Message{Type: "error", Message: "Could not create chat"})
-				} else {
-					log.Println("chatCreationSuccessful")
-					ws.WriteJSON(Message{Type: "chatCreationSuccessful", ChatUid: chatUid})
-				}
-
-			// default:
-			// 	for client := range clients {
-			// 		err := client.Ws.WriteJSON(msg)
-			// 		if err != nil {
-			// 			log.Printf("error: %v", err)
-			// 			client.Close()
-			// 			delete(clients, client)
-			// 		}
-			// 	}
+		case "registration":
+			clients[ws] = msg.Username
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(msg.Password), bcrypt.DefaultCost)
+			checkErr(err, "EncryptionError")
+			user := db.User{
+				Username: msg.Username,
+				Email: msg.Email,
+				Password: hashedPassword,
 			}
+			log.Println("inserted ", user);
+			err = dbx.InsertUser(user)
+			if (err != nil) {
+				ws.WriteJSON(Message{Type: "error", Message: "User already exists"})
+			} else {
+				ws.WriteJSON(Message{Type: "registrationSuccessful"})
+			}
+		case "login":
+			clients[ws] = msg.Username
+			log.Println("logging ", msg)
+			user, err := dbx.SelectUser("select * from users where username=?", msg.Username)
+			log.Println(user)
+			if (err != nil) {
+				ws.WriteJSON(Message{Type: "error", Message: "Username does not exist"})
+			} else {
+				err = bcrypt.CompareHashAndPassword(user.Password, []byte(msg.Password))
+				if (err != nil) {
+					ws.WriteJSON(Message{Type: "error", Message: "Wrong password"})
+				} else {
+					log.Println("loginSuccessful")
+					ws.WriteJSON(Message{Type: "loginSuccessful"})
+				}
+			}
+		case "createChat":
+			username := clients[ws]
+			user, err := dbx.SelectUser("select * from users where username=?", username)
+			chatUid := uuid.NewV4().String()
+			log.Println(chatUid)
+			userChat := db.UserChat{
+				UserId: user.Id,
+				ChatUid: chatUid,
+			}
+			err = dbx.InsertUserChat(userChat)
+
+			checkErr(err, "opa")
+			log.Println(user)
+			userChats[ws] = chatUid
+			usersMap := make(map[*User]bool)
+			u := User{
+				Username: username,
+				Ws: ws,
+			}
+			usersMap[&u] = true
+			chats[chatUid] = Chat{
+				Users: usersMap,
+				BroadcastQueue: make(chan Message),
+			}
+			if (err != nil) {
+				log.Println(err)
+				ws.WriteJSON(Message{Type: "error", Message: "Could not create chat"})
+			} else {
+				log.Println("chatCreationSuccessful")
+				ws.WriteJSON(Message{Type: "chatCreationSuccessful", ChatUid: chatUid})
+			}
+		 case "chatSelection":
+		 	usersInChat, err := dbx.SelectUsersByChat(msg.ChatUid)
+			checkErr(err, "Chat selection error")
+		 	log.Println("chat Participatnts", usersInChat)
+			ws.WriteJSON(Message{Type: "chatSelectionSuccessful", Participants: usersInChat, ChatUid: msg.ChatUid})
+		//
+		// // default:
+		// // 	for client := range clients {
+		// // 		err := client.Ws.WriteJSON(msg)
+		// // 		if err != nil {
+		// // 			log.Printf("error: %v", err)
+		// // 			client.Close()
+		// // 			delete(clients, client)
+		// // 		}
+		// // 	}
+		// }
 		// Send the newly received message to the broadcast channel
+		}
 	}
 }
 

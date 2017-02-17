@@ -1,12 +1,3 @@
-Vue.component('chat-item', {
-        props: ['chatUid'],
-        template: '<li>{{ chatUid }}</li>',
-});
-
-Vue.component('chat-item', {
-  props: ['id'],
-  template: '<li>{{ id }}</li>'
-})
 
 new Vue({
     el: '#login',
@@ -19,10 +10,13 @@ new Vue({
         username: null, // Our username
         password: null,
         joined: false, // True if email and username have been filled in
-        chatUids: [9, 10],
+        chatUids: [],
         chats: new Map(/*chatId: members*/),
         addedUser: '',
-        activeChat: null,
+        activeChat: {
+            uid: '',
+            participants: []
+        },
     },
 
     created: function() {
@@ -40,6 +34,9 @@ new Vue({
             }
             if (msg.type == 'chatCreationSuccessful') {
                 self.onChatCreationSuccessful(msg.chatUid);
+            }
+            if (msg.type == 'chatSelectionSuccessful') {
+                self.onChatSelectionSuccessful(msg.chatUid, msg.participants)
             }
             if (this.joined && msg.type == 'message') {
                 self.chatContent += '<div class="chip">'
@@ -59,9 +56,9 @@ new Vue({
             if (this.newMsg != '') {
                 this.ws.send(
                     JSON.stringify({
-                        email: this.email,
                         username: this.username,
-                        message: $('<p>').html(this.newMsg).text() // Strip out html
+                        message: $('<p>').html(this.newMsg).text(),
+                        chatUid: this.activeChat.uid
                     }
                 ));
                 this.newMsg = ''; // Reset newMsg
@@ -78,7 +75,6 @@ new Vue({
             }
             this.username = $('<p>').html(this.username).text();
             this.password = $('<p>').html(this.password).text();
-            // this.joined = true;
 
             this.ws.send(JSON.stringify({
                 email: this.email,
@@ -98,8 +94,20 @@ new Vue({
         onChatCreationSuccessful: function(chatUid) {
             this.chats.set(chatUid, []);
             this.chatUids.push(chatUid);
-            this.activeChat = chatUid;
             console.log(this.chatUids)
+        },
+        onChatSelection: function(e) {
+            this.ws.send(JSON.stringify({
+                type: 'chatSelection',
+                username: this.username,
+                chatUid: e.target.innerText
+            }))
+        },
+        onChatSelectionSuccessful: function(chatUid, participants) {
+            this.chats.set(chatUid, participants);
+            this.activeChat = { uid: chatUid, participants: participants };
+            console.log(this.chats)
+            console.log('active chat' , chatUid);
         },
 
         gravatarURL: function(email) {

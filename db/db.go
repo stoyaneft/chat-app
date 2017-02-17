@@ -64,14 +64,18 @@ func (db *Db) InsertUserChat(userChat UserChat) error {
 	return err;
 }
 
-func (db *Db) SelectUserChat(query string, userId int64) (UserChat, error) {
-	var userChat UserChat
-	err := db.dbmap.SelectOne(&userChat, query, userId)
-	return userChat, err
+func (db *Db) SelectUsersByChat(chatUid string) ([]string, error) {
+	var users []User
+	_, err := db.dbmap.Select(&users, "select users.Username from user_chats join users where chatUid=?", chatUid)
+	userIds := make([]string, len(users))
+	for idx, user := range(users) {
+		userIds[idx] = user.Username
+	}
+	return userIds, err
 }
 
 func checkErr(err error, msg string) {
     if err != nil {
-        log.Fatalln(msg, err)
+	log.Fatalln(msg, err)
     }
 }

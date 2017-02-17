@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Simple Chat</title>
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.8/css/materialize.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/emojione/2.2.6/assets/css/emojione.min.css"/>
@@ -25,21 +24,23 @@
     <ul id="slide-out" class="side-nav">
       <li><a class="subheader"><i class="material-icons">chat</i>Chats</a></li>
       <li><div class="divider"></div></li>
-          <chat-item v-for="chatUid in chatUids" v-bind:id="chatUid"></chat-item>
-      <!-- <chat-item v-for="chatId in chatIds" v-bind:chatId="chatId"></chat-item> -->
+      <li v-for="chatUid in chatUids" v-bind:id="chatUid" v-on:click="onChatSelection">
+          {{chatUid}}
+      </li>
       <button class="btn" @click="createChat()">Create Chat</button>
     </ul>
+    <h3 class="center-align" v-if="activeChat.uid">Chat with <span v-for="p in activeChat.participants">{{p}} </span></h3>
      <button data-activates="slide-out" class="button-collapse right"><i class="material-icons">chat</i>Show chats</button>
-    <div class="row" v-if="joined">
+    <div class="row" v-if="joined && activeChat.uid">
         <div class="col s12">
             <div class="card horizontal">
                 <div id="chat-messages" class="card-content" v-html="chatContent">
                 </div>
             </div>
-            <input type="text" v-if="joined" placeholder="Add user" v-model="addedUser" @keyup.enter="send">
+            <input type="text" v-if="joined" placeholder="Add user" v-model="addedUser" @keyup.enter="addUser">
         </div>
     </div>
-    <div class="row" v-if="joined">
+    <div class="row" v-if="joined && activeChat.uid">
         <div class="input-field col s8">
             <input type="text" v-model="newMsg" @keyup.enter="send">
         </div>
@@ -81,10 +82,8 @@
 $('.button-collapse').sideNav({
       menuWidth: 300, // Default is 300
       edge: 'right', // Choose the horizontal origin
-      closeOnClick: true, // Closes side-nav on <a> clicks, useful for Angular/Meteor
       draggable: true // Choose whether you can drag to open on touch screens
-    }
-  );
+    });
 </script>
 </body>
 </html>
