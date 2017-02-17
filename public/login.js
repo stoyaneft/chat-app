@@ -16,34 +16,40 @@ new Vue({
         addedUser: '',
         activeChat: {
             uid: '',
-            participants: []
+            participants: [],
+            messages: ''
         },
     },
 
     created: function() {
-         $(".button-collapse").sideNav();
+         // $(".button-collapse").sideNav();
         var self = this;
         this.ws = new WebSocket('ws://' + window.location.host + '/ws');
         this.ws.addEventListener('message', function(e) {
             var msg = JSON.parse(e.data);
-            console.log('msg ', msg)
-            if (msg.type == 'error') {
-                Materialize.toast(msg.message, 2000);
-            }
-            if (msg.type == 'loginSuccessful') {
-                self.onLoginSuccessful();
-            }
-            if (msg.type == 'chatCreationSuccessful') {
-                self.onChatCreationSuccessful(msg.chatUid);
-            }
-            if (msg.type == 'chatSelectionSuccessful') {
-                self.onChatSelectionSuccessful(msg.chatUid, msg.participants)
-            }
-            if (msg.type == 'userAddedSuccessful') {
-                self.onUserAddedSuccessful(msg.username);
-            }
-            if (msg.type == 'sendMessage') {
-                self.onSendMessage(msg);
+            console.log('msg ', msg);
+            switch (msg.type) {
+                case 'error':
+                    console.log('ha')
+                    Materialize.toast(msg.message, 2000);
+                    break;
+                case 'loginSuccessful':
+                    self.onLoginSuccessful();
+                    break;
+                case 'chatCreationSuccessful':
+                    self.onChatCreationSuccessful(msg.chatUid);
+                    break;
+                case 'chatSelectionSuccessful':
+                    self.onChatSelectionSuccessful(msg.chatUid, msg.participants);
+                    break;
+                case 'userAddedSuccessful':
+                    self.onUserAddedSuccessful(msg.username);
+                    break;
+                case 'sendMessage':
+                    self.onSendMessage(msg);
+                    break;
+                case 'addedToChat':
+                    self.onAddedToChat(msg.chatUid, msg.participants);
             }
         });
     },
@@ -91,7 +97,7 @@ new Vue({
             }));
         },
         onChatCreationSuccessful: function(chatUid) {
-            this.chats.set(chatUid, []);
+            this.chats.set(chatUid, { uid: chatUid, participants: [], messages: '' });
             this.chatUids.push(chatUid);
             console.log(this.chatUids)
         },
@@ -105,8 +111,9 @@ new Vue({
         onChatSelectionSuccessful: function(chatUid, participants) {
             var otherMembers = participants.filter(p => p !== this.username);
             console.log(otherMembers)
-            this.activeChat = { uid: chatUid, participants: otherMembers };
-            this.chats.set(chatUid, participants);
+            var chat = this.chats.get(chatUid);
+            chat.participants = otherMembers;
+            this.activeChat = chat;
             console.log(this.chats)
             console.log('active chat' , this.activeChat);
         },
@@ -124,20 +131,34 @@ new Vue({
             }));
         },
         onUserAddedSuccessful: function (addedUser) {
-            this.activeChat.participants.push(addedUser);
+            var chat = this.chats.get(this.activeChat.uid);
+            chat.participants.push(addedUser);
             console.log(this.activeChat.participants);
+        },
+
+        onAddedToChat: function (chatUid, participants) {
+            this.chats.set(chatUid, { uid: chatUid, participants, messages: '' });
+            this.chatUids.push(chatUid);
         },
 
         onSendMessage: function (msg) {
             console.log('received message ', msg);
-            this.chatContent += '<div class="chip">'
+            var chatMessage = '<div class="chip">'
                 + '<img src="' + this.gravatarURL(msg.email) + '">' // Avatar
                 + msg.username
                 + '</div>'
                 + emojione.toImage(msg.message) + '<br/>'; // Parse emojis
-
-            var element = document.getElementById('chat-messages');
-            element.scrollTop = element.scrollHeight; // Auto scroll to the bottom
+            var chat = this.chats.get(msg.chatUid);
+            console.log(chat);
+            chat.messages += chatMessage;
+            // this.chats.set(msg.chatUid, chat);
+            if (msg.chatUid === this.activeChat.uid) {
+                console.log(this.activeChat)
+                // this.activeChat.messages += chatMessage;
+                var element = document.getElementById('chat-messages');
+                element.scrollTop = element.scrollHeight; // Auto scroll to the bottom
+                console.log(this.activeChat.messages);
+            }
         },
 
         gravatarURL: function(email) {

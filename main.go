@@ -74,6 +74,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			user, err := dbx.SelectUser("select * from users where username=?", msg.Username)
 			log.Println(user)
 			if (err != nil) {
+				log.Println(err)
 				ws.WriteJSON(Message{Type: "error", Message: "Username does not exist"})
 			} else {
 				err = bcrypt.CompareHashAndPassword(user.Password, []byte(msg.Password))
@@ -131,13 +132,18 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			checkErr(err, "Insertion user chat error");
 			ws.WriteJSON(Message{Type: "userAddedSuccessful", Username: user.Username})
 			log.Println("Added user ", user);
-			chats[msg.ChatUid].Users[users[msg.Username]] = true
+			usersInChat, err := dbx.SelectUsersByChat(msg.ChatUid)
+			checkErr(err, "Chat selection error")
+			addedUserWs := users[msg.Username];
+			addedUserWs.WriteJSON(Message{Type: "addedToChat", ChatUid: msg.ChatUid, Participants: usersInChat})
+			chats[msg.ChatUid].Users[addedUserWs] = true
 		case "sendMessage":
 			log.Println("Received message", msg)
 			chats[msg.ChatUid].BroadcastQueue <- msg
 		}
 	}
 }
+
 func handleMessages(chatUid string) {
 	chat := chats[chatUid]
 	for msg := range chat.BroadcastQueue {
@@ -156,11 +162,11 @@ func handleMessages(chatUid string) {
 }
 
 func loadPage(filename string) ([]byte, error) {
-    body, err := ioutil.ReadFile(filename)
-    if err != nil {
-        return nil, err
-    }
-    return body, nil
+	body, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {

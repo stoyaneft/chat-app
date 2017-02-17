@@ -34,7 +34,7 @@
     <div class="row" v-if="joined && activeChat.uid">
         <div class="col s12">
             <div class="card horizontal">
-                <div id="chat-messages" class="card-content" v-html="chatContent">
+                <div id="chat-messages" class="card-content" v-html="activeChat.messages">
                 </div>
             </div>
             <input type="text" v-if="joined" placeholder="Add user" v-model="addedUser" @keyup.enter="addUser">
