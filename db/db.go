@@ -74,8 +74,23 @@ func (db *Db) SelectUsersByChat(chatUid string) ([]string, error) {
 	return userIds, err
 }
 
+func (db *Db) SelectUserChats(username string) ([]string, error) {
+	var userChats []UserChat
+	_, err := db.dbmap.Select(&userChats, "select ChatUid from user_chats join users where users.Id=user_chats.UserId and users.Username=?", username)
+	chatUids := make([]string, len(userChats))
+	for idx, userChat := range(userChats) {
+		chatUids[idx] = userChat.ChatUid
+	}
+	return chatUids, err
+}
+
+func (db *Db) InsertMessage(msg ChatMessage) error {
+	err := db.Insert(&msg);
+	return err
+}
+
 func checkErr(err error, msg string) {
-    if err != nil {
-	log.Fatalln(msg, err)
-    }
+	if err != nil {
+		log.Fatalln(msg, err)
+	}
 }

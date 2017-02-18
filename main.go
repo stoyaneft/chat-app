@@ -17,6 +17,12 @@ type Chat struct {
 	BroadcastQueue chan Message
 }
 
+type ChatInfo struct {
+	Uid string
+	Participants []string
+	Messages []string
+}
+
 var chats = make(map[string]Chat) // {chatUid: Chat}
 var users = make(map[string]*websocket.Conn);
 
@@ -33,6 +39,7 @@ type Message struct {
 	Type string `json:"type"`
 	ChatUid string `json:"chatUid"`
 	Participants []string `json:"participants"`
+	Chats []ChatInfo `json:"chats"`
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +90,26 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				} else {
 					log.Println("loginSuccessful")
 					users[msg.Username] = ws;
-					ws.WriteJSON(Message{Type: "loginSuccessful"})
+					userChats, _ := dbx.SelectUserChats(msg.Username)
+					chatInfos := make([]ChatInfo, len(userChats))
+					for idx, chatUid := range userChats {
+						participants, _ := dbx.SelectUsersByChat(chatUid)
+						if _, ok := chats[chatUid]; !ok {
+							log.Println("creating chat")
+							chats[chatUid] = Chat{
+								Users: map[*websocket.Conn]bool{ws: true},
+								BroadcastQueue: make(chan Message),
+							}
+							go handleMessages(chatUid)
+						} else {
+							log.Println("Adding to chat")
+							chats[chatUid].Users[ws] = true
+							log.Println(len(chats[chatUid].Users))
+						}
+						chatInfo := ChatInfo{Uid: chatUid, Participants: participants}
+						chatInfos[idx] = chatInfo
+					}
+					ws.WriteJSON(Message{Type: "loginSuccessful", Chats: chatInfos })
 				}
 			}
 		case "createChat":
@@ -130,22 +156,30 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			}
 			err = dbx.InsertUserChat(userChat)
 			checkErr(err, "Insertion user chat error");
-			ws.WriteJSON(Message{Type: "userAddedSuccessful", Username: user.Username})
+			//ws.WriteJSON(Message{Type: "userAddedSuccessful", Username: user.Username})
 			log.Println("Added user ", user);
 			usersInChat, err := dbx.SelectUsersByChat(msg.ChatUid)
 			checkErr(err, "Chat selection error")
-			addedUserWs := users[msg.Username];
-			addedUserWs.WriteJSON(Message{Type: "addedToChat", ChatUid: msg.ChatUid, Participants: usersInChat})
-			chats[msg.ChatUid].Users[addedUserWs] = true
+			for _, chatMember := range usersInChat {
+				if chatMemberWs, ok := users[chatMember]; ok {
+					chatMemberWs.WriteJSON(Message{Type: "userAddedSuccessful", Username: user.Username})
+				}
+			}
+			if addedUserWs, ok := users[msg.Username]; ok {
+				addedUserWs.WriteJSON(Message{Type: "addedToChat", ChatUid: msg.ChatUid, Participants: usersInChat})
+				chats[msg.ChatUid].Users[addedUserWs] = true
+			}
 		case "sendMessage":
 			log.Println("Received message", msg)
 			chats[msg.ChatUid].BroadcastQueue <- msg
+			err := dbx.InsertMessage(msg)
 		}
 	}
 }
 
 func handleMessages(chatUid string) {
 	chat := chats[chatUid]
+	log.Println(chat)
 	for msg := range chat.BroadcastQueue {
 		log.Println("opaaaa", msg)
 		// Grab the next message from the broadcast channel

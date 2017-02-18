@@ -40,19 +40,6 @@ new Vue({
     },
 
     methods: {
-        send: function () {
-            if (this.newMsg != '') {
-                this.ws.send(
-                    JSON.stringify({
-                        email: this.email,
-                        username: this.username,
-                        message: $('<p>').html(this.newMsg).text() // Strip out html
-                    }
-                ));
-                this.newMsg = ''; // Reset newMsg
-            }
-        },
-
         join: function () {
             if (!this.email) {
                 Materialize.toast('You must enter an email', 2000);

@@ -34,7 +34,7 @@ new Vue({
                     Materialize.toast(msg.message, 2000);
                     break;
                 case 'loginSuccessful':
-                    self.onLoginSuccessful();
+                    self.onLoginSuccessful(msg.chats);
                     break;
                 case 'chatCreationSuccessful':
                     self.onChatCreationSuccessful(msg.chatUid);
@@ -87,8 +87,14 @@ new Vue({
                 type: 'login'
             }));
         },
-        onLoginSuccessful: function() {
+        onLoginSuccessful: function(chats) {
             this.joined = true;
+            for (const chat of chats) {
+                console.log(chat.Uid)
+                this.chats.set(chat.Uid, { uid: chat.Uid, messages: chat.Messages || '', participants: chat.Participants || []});
+                this.chatUids.push(chat.Uid);
+            }
+            console.log('uids', this.chatUids)
         },
         createChat: function() {
             this.ws.send(JSON.stringify({
