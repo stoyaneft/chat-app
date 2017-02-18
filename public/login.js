@@ -30,7 +30,6 @@ new Vue({
             console.log('msg ', msg);
             switch (msg.type) {
                 case 'error':
-                    console.log('ha')
                     Materialize.toast(msg.message, 2000);
                     break;
                 case 'loginSuccessful':
@@ -89,17 +88,16 @@ new Vue({
         },
         onLoginSuccessful: function(chats) {
             this.joined = true;
+            $('#chats').removeClass("hidden")
+            console.log($('.button-collapse').sideNav)
             for (const chat of chats) {
-                console.log(chat.Uid)
                 let messages = '';
                 for (const message of chat.Messages) {
-                    console.log(message)
                     messages += this.createMessage({message: message.Message, username: message.Username});
                 }
                 this.chats.set(chat.Uid, { uid: chat.Uid, messages, participants: chat.Participants || []});
                 this.chatUids.push(chat.Uid);
             }
-            console.log('uids', this.chatUids)
         },
         createChat: function() {
             this.ws.send(JSON.stringify({
@@ -110,7 +108,6 @@ new Vue({
         onChatCreationSuccessful: function(chatUid) {
             this.chats.set(chatUid, { uid: chatUid, participants: [], messages: '' });
             this.chatUids.push(chatUid);
-            console.log(this.chatUids)
         },
         onChatSelection: function(e) {
             this.ws.send(JSON.stringify({
@@ -121,16 +118,11 @@ new Vue({
         },
         onChatSelectionSuccessful: function(chatUid, participants) {
             var otherMembers = participants.filter(p => p !== this.username);
-            console.log(otherMembers)
             var chat = this.chats.get(chatUid);
             chat.participants = otherMembers;
             this.activeChat = chat;
-            console.log(this.chats)
-            console.log('active chat' , this.activeChat);
         },
         addUser: function() {
-            console.log('adding');
-            console.log(this.addedUser);
             if (this.activeChat.participants.indexOf(this.addedUser) !== -1 || this.addedUser === this.username) {
                 Materialize.toast(`The user ${this.addedUser} is already in the chat`, 2000);
                 return;
@@ -144,7 +136,6 @@ new Vue({
         onUserAddedSuccessful: function (addedUser) {
             var chat = this.chats.get(this.activeChat.uid);
             chat.participants.push(addedUser);
-            console.log(this.activeChat.participants);
         },
 
         onAddedToChat: function (chatUid, participants) {
@@ -160,18 +151,13 @@ new Vue({
         },
 
         onSendMessage: function (msg) {
-            console.log('received message ', msg);
             var chatMessage = this.createMessage(msg);
             var chat = this.chats.get(msg.chatUid);
-            console.log(chat);
             chat.messages += chatMessage;
-            // this.chats.set(msg.chatUid, chat);
             if (msg.chatUid === this.activeChat.uid) {
-                console.log(this.activeChat)
                 // this.activeChat.messages += chatMessage;
                 var element = document.getElementById('chat-messages');
                 element.scrollTop = element.scrollHeight; // Auto scroll to the bottom
-                console.log(this.activeChat.messages);
             }
         },
 

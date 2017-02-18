@@ -2,13 +2,12 @@ package db
 
 import (
 	"fmt"
-	"testing"
 	"os"
-
+	"testing"
 	//"gopkg.in/gorp.v1"
 )
-var dbx = &Db{}
 
+var dbx = &Db{}
 
 func TestMain(m *testing.M) {
 	dbx.Init("test.db")
@@ -16,7 +15,7 @@ func TestMain(m *testing.M) {
 
 	dbx.dbmap.Db.Close()
 	err := os.Remove("test.db")
-	if (err != nil) {
+	if err != nil {
 		fmt.Println(err)
 	}
 	os.Exit(retCode)
@@ -28,6 +27,7 @@ func TestDb_Init(t *testing.T) {
 		t.Errorf("Error: db is not created")
 	}
 }
+
 //
 func TestDb_InsertUser(t *testing.T) {
 	if err := dbx.InsertUser(User{Username: "username", Email: "email", Password: []byte("pass")}); err != nil {
@@ -115,6 +115,3 @@ func TestDb_SelectUsersByChat(t *testing.T) {
 		t.Errorf("Error: chat does not match")
 	}
 }
-
-
-

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Simple Chat</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.8/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/materialize.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/emojione/2.2.6/assets/css/emojione.min.css"/>
     <link rel="stylesheet" href="/style.css">
@@ -29,8 +29,10 @@
       </li>
       <button class="btn" @click="createChat()">Create Chat</button>
     </ul>
-     <button data-activates="slide-out" class="button-collapse right"><i class="material-icons">chat</i>Show chats</button>
-    <h3 class="center-align" v-if="activeChat.uid">Chat with <span v-for="p in activeChat.participants">{{p}} |</span></h3>
+    <div id="chats" class="hidden">
+        <button data-activates="slide-out" class="button-collapse right"><i class="material-icons">chat</i>Show chats</button>
+        <h3 class="center-align" v-if="activeChat.uid">Chat with <span v-for="p in activeChat.participants">{{p}}|</span></h3>
+    </div>
     <div class="row" v-if="joined && activeChat.uid">
         <div class="col s12">
             <div class="card horizontal">
@@ -42,7 +44,7 @@
     </div>
     <div class="row" v-if="joined && activeChat.uid">
         <div class="input-field col s8">
-            <input type="text" v-model="newMsg" @keyup.enter="send">
+            <input type="text" v-model="newMsg" placeholder="Send Message" @keyup.enter="send">
         </div>
         <div class="input-field col s4">
             <button class="waves-effect waves-light btn" @click="send">
@@ -76,7 +78,7 @@
 <script src="https://cdn.jsdelivr.net/emojione/2.2.6/lib/js/emojione.min.js"></script>
 <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/rollups/md5.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.8/js/materialize.min.js"></script>
+<script src="/js/materialize.min.js"></script>
 <script src="/login.js"></script>
 <script>
 $('.button-collapse').sideNav({
