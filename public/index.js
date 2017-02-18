@@ -56,7 +56,6 @@ new Vue({
             this.email = $('<p>').html(this.email).text();
             this.username = $('<p>').html(this.username).text();
             this.password = $('<p>').html(this.password).text();
-            // this.joined = true;
 
             this.ws.send(JSON.stringify({
                 email: this.email,
@@ -66,7 +65,7 @@ new Vue({
             }));
         },
         onRegistrationSuccessful: function() {
-            this.joined = true;
+            window.location.href = '/login';
         },
 
         gravatarURL: function(email) {

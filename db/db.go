@@ -55,9 +55,9 @@ func (db *Db) InsertUser(user User) error {
 	return err
 }
 
-func (db *Db) SelectUser(query string, username string) (User, error) {
+func (db *Db) SelectUser(username string) (User, error) {
 	var user User
-	err := db.dbmap.SelectOne(&user, query, username)
+	err := db.dbmap.SelectOne(&user, "select * from users where username=?", username)
 	return user, err
 }
 

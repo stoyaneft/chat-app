@@ -26,11 +26,9 @@ type ChatInfo struct {
 var chats = make(map[string]Chat) // {chatUid: Chat}
 var users = make(map[string]*websocket.Conn);
 
-// Configure the upgrader
 var upgrader = websocket.Upgrader{}
 var dbx = &db.Db{}
 
-// Define our message object
 type Message struct {
 	Email    string `json:"email"`
 	Username string `json:"username"`
@@ -43,155 +41,38 @@ type Message struct {
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
-	// Upgrade initial GET request to a websocket
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Fatal(err)
+		checkErr(err, "Could not upgrade to websockets")
 	}
-	// Make sure we close the connection when the function returns
 	defer ws.Close()
-	// clients[ws] = true
 	for {
 		var msg Message
-		// Read in a new message as JSON and map it to a Message object
 		err := ws.ReadJSON(&msg)
 		if err != nil {
 			log.Printf("error: %v", err)
-			// delete(clients, ws)
 			break
 		}
 		switch msg.Type {
 		case "registration":
-			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(msg.Password), bcrypt.DefaultCost)
-			checkErr(err, "EncryptionError")
-			user := db.User{
-				Username: msg.Username,
-				Email: msg.Email,
-				Password: hashedPassword,
-			}
-			log.Println("inserted ", user);
-			err = dbx.InsertUser(user)
-			if (err != nil) {
-				ws.WriteJSON(Message{Type: "error", Message: "User already exists"})
-			} else {
-				ws.WriteJSON(Message{Type: "registrationSuccessful"})
-			}
+			handleRegistration(msg, ws)
 		case "login":
-			log.Println("logging ", msg)
-			user, err := dbx.SelectUser("select * from users where username=?", msg.Username)
-			log.Println(user)
-			if (err != nil) {
-				log.Println(err)
-				ws.WriteJSON(Message{Type: "error", Message: "Username does not exist"})
-			} else {
-				err = bcrypt.CompareHashAndPassword(user.Password, []byte(msg.Password))
-				if (err != nil) {
-					ws.WriteJSON(Message{Type: "error", Message: "Wrong password"})
-				} else {
-					log.Println("loginSuccessful")
-					users[msg.Username] = ws;
-					userChats, _ := dbx.SelectUserChats(msg.Username)
-					chatInfos := make([]ChatInfo, len(userChats))
-					for idx, chatUid := range userChats {
-						participants, _ := dbx.SelectUsersByChat(chatUid)
-						messages, _ := dbx.SelectMessagesByChat(chatUid)
-						log.Println(messages)
-						if _, ok := chats[chatUid]; !ok {
-							log.Println("creating chat")
-							chats[chatUid] = Chat{
-								Users: map[*websocket.Conn]bool{ws: true},
-								BroadcastQueue: make(chan Message),
-							}
-							go handleMessages(chatUid)
-						} else {
-							log.Println("Adding to chat")
-							chats[chatUid].Users[ws] = true
-							log.Println(len(chats[chatUid].Users))
-						}
-						chatInfo := ChatInfo{Uid: chatUid, Participants: participants, Messages: messages}
-						chatInfos[idx] = chatInfo
-					}
-					ws.WriteJSON(Message{Type: "loginSuccessful", Chats: chatInfos })
-				}
-			}
+			handleLogin(msg, ws)
 		case "createChat":
-			username := msg.Username
-			user, err := dbx.SelectUser("select * from users where username=?", username)
-			chatUid := uuid.NewV4().String()
-			log.Println(chatUid)
-			userChat := db.UserChat{
-				UserId: user.Id,
-				ChatUid: chatUid,
-			}
-			err = dbx.InsertUserChat(userChat)
-
-			checkErr(err, "Insertion user chat error");
-			log.Println(user)
-			chats[chatUid] = Chat{
-				Users: map[*websocket.Conn]bool{ws: true},
-				BroadcastQueue: make(chan Message),
-			}
-			if (err != nil) {
-				log.Println(err)
-				ws.WriteJSON(Message{Type: "error", Message: "Could not create chat"})
-			} else {
-				log.Println("chatCreationSuccessful")
-				ws.WriteJSON(Message{Type: "chatCreationSuccessful", ChatUid: chatUid})
-			}
-			go handleMessages(chatUid);
+			handleCreateChat(msg, ws)
 		case "chatSelection":
-			 log.Println("selection msg", msg)
-		 	usersInChat, err := dbx.SelectUsersByChat(msg.ChatUid)
-			checkErr(err, "Chat selection error")
-		 	log.Println("chat Participatnts", usersInChat)
-			ws.WriteJSON(Message{Type: "chatSelectionSuccessful", Participants: usersInChat, ChatUid: msg.ChatUid})
+			handleChatSelection(msg, ws)
 		case "addUser":
-			user, err := dbx.SelectUser("select * from users where username=?", msg.Username)
-			if (err != nil) {
-				log.Println(err)
-				ws.WriteJSON(Message{Type: "error", Message: "User does not exist"})
-				continue
-			}
-			userChat := db.UserChat{
-				UserId: user.Id,
-				ChatUid: msg.ChatUid,
-			}
-			err = dbx.InsertUserChat(userChat)
-			checkErr(err, "Insertion user chat error");
-			//ws.WriteJSON(Message{Type: "userAddedSuccessful", Username: user.Username})
-			log.Println("Added user ", user);
-			usersInChat, err := dbx.SelectUsersByChat(msg.ChatUid)
-			checkErr(err, "Chat selection error")
-			for _, chatMember := range usersInChat {
-				if chatMemberWs, ok := users[chatMember]; ok {
-					chatMemberWs.WriteJSON(Message{Type: "userAddedSuccessful", Username: user.Username})
-				}
-			}
-			if addedUserWs, ok := users[msg.Username]; ok {
-				addedUserWs.WriteJSON(Message{Type: "addedToChat", ChatUid: msg.ChatUid, Participants: usersInChat})
-				chats[msg.ChatUid].Users[addedUserWs] = true
-			}
+			handleAddUser(msg, ws)
 		case "sendMessage":
-			log.Println("Received message", msg)
-			chats[msg.ChatUid].BroadcastQueue <- msg
-			message := db.ChatMessage{
-				Username: msg.Username,
-				ChatUid: msg.ChatUid,
-				Message: msg.Message,
-			}
-			err := dbx.InsertMessage(message)
-			checkErr(err, "Insertion error")
+			handleSendMessage(msg)
 		}
 	}
 }
 
-
 func handleMessages(chatUid string) {
 	chat := chats[chatUid]
-	log.Println(chat)
 	for msg := range chat.BroadcastQueue {
-		log.Println("opaaaa", msg)
-		// Grab the next message from the broadcast channel
 		for user := range chat.Users {
 			err := user.WriteJSON(msg)
 			if err != nil {
@@ -199,8 +80,130 @@ func handleMessages(chatUid string) {
 				user.Close()
 				delete(chat.Users, user)
 			}
-			log.Println("Message sent")
 		}
+	}
+}
+
+func handleRegistration(msg Message, ws *websocket.Conn) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(msg.Password), bcrypt.DefaultCost)
+	checkErr(err, "EncryptionError")
+	user := db.User{
+		Username: msg.Username,
+		Email: msg.Email,
+		Password: hashedPassword,
+	}
+	err = dbx.InsertUser(user)
+	if (err != nil) {
+		ws.WriteJSON(Message{Type: "error", Message: "User already exists"})
+	} else {
+		ws.WriteJSON(Message{Type: "registrationSuccessful"})
+	}
+}
+
+func handleLogin(msg Message, ws *websocket.Conn) {
+	log.Println("logging ", msg)
+	user, err := dbx.SelectUser(msg.Username)
+	if (err != nil) {
+		log.Println(err)
+		ws.WriteJSON(Message{Type: "error", Message: "Username does not exist"})
+	} else {
+		err = bcrypt.CompareHashAndPassword(user.Password, []byte(msg.Password))
+		if (err != nil) {
+			ws.WriteJSON(Message{Type: "error", Message: "Wrong password"})
+		} else {
+			log.Println("loginSuccessful")
+			users[msg.Username] = ws;
+			userChats, _ := dbx.SelectUserChats(msg.Username)
+			chatInfos := make([]ChatInfo, len(userChats))
+			for idx, chatUid := range userChats {
+				participants, _ := dbx.SelectUsersByChat(chatUid)
+				messages, _ := dbx.SelectMessagesByChat(chatUid)
+				if _, ok := chats[chatUid]; !ok {
+					chats[chatUid] = Chat{
+						Users: map[*websocket.Conn]bool{ws: true},
+						BroadcastQueue: make(chan Message),
+					}
+					go handleMessages(chatUid)
+				} else {
+					chats[chatUid].Users[ws] = true
+					log.Println(len(chats[chatUid].Users))
+				}
+				chatInfo := ChatInfo{Uid: chatUid, Participants: participants, Messages: messages}
+				chatInfos[idx] = chatInfo
+			}
+			ws.WriteJSON(Message{Type: "loginSuccessful", Chats: chatInfos })
+		}
+	}
+}
+
+func handleCreateChat(msg Message, ws *websocket.Conn) {
+	username := msg.Username
+	user, err := dbx.SelectUser(username)
+	chatUid := uuid.NewV4().String()
+	userChat := db.UserChat{
+		UserId: user.Id,
+		ChatUid: chatUid,
+	}
+	err = dbx.InsertUserChat(userChat)
+	if (err != nil) {
+		log.Println(err)
+		ws.WriteJSON(Message{Type: "error", Message: "Could not create chat"})
+	} else {
+		log.Println("chatCreationSuccessful")
+		ws.WriteJSON(Message{Type: "chatCreationSuccessful", ChatUid: chatUid})
+	}
+	chats[chatUid] = Chat{
+		Users: map[*websocket.Conn]bool{ws: true},
+		BroadcastQueue: make(chan Message),
+	}
+	go handleMessages(chatUid);
+}
+
+func handleChatSelection(msg Message, ws *websocket.Conn) {
+	usersInChat, err := dbx.SelectUsersByChat(msg.ChatUid)
+	checkErr(err, "Chat selection error")
+	log.Println("chat Participatnts", usersInChat)
+	ws.WriteJSON(Message{Type: "chatSelectionSuccessful", Participants: usersInChat, ChatUid: msg.ChatUid})
+}
+
+func handleAddUser(msg Message, ws *websocket.Conn)  {
+	user, err := dbx.SelectUser(msg.Username)
+	if (err != nil) {
+		log.Println(err)
+		ws.WriteJSON(Message{Type: "error", Message: "User does not exist"})
+		return
+	}
+	userChat := db.UserChat{
+		UserId: user.Id,
+		ChatUid: msg.ChatUid,
+	}
+	err = dbx.InsertUserChat(userChat)
+	checkErr(err, "Insertion user chat error");
+	log.Println("Added user ", user);
+	usersInChat, err := dbx.SelectUsersByChat(msg.ChatUid)
+	checkErr(err, "Chat selection error")
+	for _, chatMember := range usersInChat {
+		if chatMemberWs, ok := users[chatMember]; ok {
+			chatMemberWs.WriteJSON(Message{Type: "userAddedSuccessful", Username: user.Username})
+		}
+	}
+	if addedUserWs, ok := users[msg.Username]; ok {
+		addedUserWs.WriteJSON(Message{Type: "addedToChat", ChatUid: msg.ChatUid, Participants: usersInChat})
+		chats[msg.ChatUid].Users[addedUserWs] = true
+	}
+}
+
+func handleSendMessage(msg Message)  {
+	log.Println("Received message", msg)
+	chats[msg.ChatUid].BroadcastQueue <- msg
+	message := db.ChatMessage{
+		Username: msg.Username,
+		ChatUid: msg.ChatUid,
+		Message: msg.Message,
+	}
+	err := dbx.InsertMessage(message)
+	if (err != nil) {
+		log.Println("Could not insert message: ", err)
 	}
 }
 
@@ -228,19 +231,12 @@ func main() {
 	fs := http.FileServer(http.Dir("./public"))
 	http.Handle("/", fs)
 	http.HandleFunc("/login/", loginHandler)
-	// Configure websocket route
 	http.HandleFunc("/ws", handleConnections)
 	dbx.Init("db/chat.db")
-
-	// Start listening for incoming chat messages
-	// go handleMessages()
 
 	log.Println("http server started on :8001")
 	err := http.ListenAndServe(":8001", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
-	// db := &db.Db{}
-	// db.Insert(User{})
-
 }
