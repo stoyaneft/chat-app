@@ -20,7 +20,7 @@ type Chat struct {
 type ChatInfo struct {
 	Uid string
 	Participants []string
-	Messages []string
+	Messages []db.ChatMessage
 }
 
 var chats = make(map[string]Chat) // {chatUid: Chat}
@@ -94,6 +94,8 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 					chatInfos := make([]ChatInfo, len(userChats))
 					for idx, chatUid := range userChats {
 						participants, _ := dbx.SelectUsersByChat(chatUid)
+						messages, _ := dbx.SelectMessagesByChat(chatUid)
+						log.Println(messages)
 						if _, ok := chats[chatUid]; !ok {
 							log.Println("creating chat")
 							chats[chatUid] = Chat{
@@ -106,7 +108,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 							chats[chatUid].Users[ws] = true
 							log.Println(len(chats[chatUid].Users))
 						}
-						chatInfo := ChatInfo{Uid: chatUid, Participants: participants}
+						chatInfo := ChatInfo{Uid: chatUid, Participants: participants, Messages: messages}
 						chatInfos[idx] = chatInfo
 					}
 					ws.WriteJSON(Message{Type: "loginSuccessful", Chats: chatInfos })
@@ -172,10 +174,17 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		case "sendMessage":
 			log.Println("Received message", msg)
 			chats[msg.ChatUid].BroadcastQueue <- msg
-			err := dbx.InsertMessage(msg)
+			message := db.ChatMessage{
+				Username: msg.Username,
+				ChatUid: msg.ChatUid,
+				Message: msg.Message,
+			}
+			err := dbx.InsertMessage(message)
+			checkErr(err, "Insertion error")
 		}
 	}
 }
+
 
 func handleMessages(chatUid string) {
 	chat := chats[chatUid]
@@ -207,11 +216,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := loadPage("public/login.html")
 	checkErr(err, "Error loading page login.html")
 	w.Write(body)
-}
-
-// Validates user credentials
-func validateCredentials(msg Message) bool {
- 	return true
 }
 
 func checkErr(err error, msg string) {

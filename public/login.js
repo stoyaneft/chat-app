@@ -91,7 +91,12 @@ new Vue({
             this.joined = true;
             for (const chat of chats) {
                 console.log(chat.Uid)
-                this.chats.set(chat.Uid, { uid: chat.Uid, messages: chat.Messages || '', participants: chat.Participants || []});
+                let messages = '';
+                for (const message of chat.Messages) {
+                    console.log(message)
+                    messages += this.createMessage({message: message.Message, username: message.Username});
+                }
+                this.chats.set(chat.Uid, { uid: chat.Uid, messages, participants: chat.Participants || []});
                 this.chatUids.push(chat.Uid);
             }
             console.log('uids', this.chatUids)
@@ -146,14 +151,17 @@ new Vue({
             this.chats.set(chatUid, { uid: chatUid, participants, messages: '' });
             this.chatUids.push(chatUid);
         },
+        createMessage(msg) {
+            return '<div class="chip">'
+            + '<img src="' + this.gravatarURL(msg.email) + '">' // Avatar
+            + msg.username
+            + '</div>'
+            + emojione.toImage(msg.message) + '<br/>'; // Parse emojis
+        },
 
         onSendMessage: function (msg) {
             console.log('received message ', msg);
-            var chatMessage = '<div class="chip">'
-                + '<img src="' + this.gravatarURL(msg.email) + '">' // Avatar
-                + msg.username
-                + '</div>'
-                + emojione.toImage(msg.message) + '<br/>'; // Parse emojis
+            var chatMessage = this.createMessage(msg);
             var chat = this.chats.get(msg.chatUid);
             console.log(chat);
             chat.messages += chatMessage;

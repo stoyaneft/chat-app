@@ -3,6 +3,7 @@ package db
 import(
 	"database/sql"
 	 "log"
+	"time"
 
 	"gopkg.in/gorp.v1"
 	_ "github.com/mattn/go-sqlite3"
@@ -26,7 +27,7 @@ type Chat struct {
 }
 
 type ChatMessage struct {
-	UserId int64
+	Username string
 	ChatUid string
 	Message string
 	CreatedAt int64
@@ -41,8 +42,9 @@ func (db *Db) Init(dbPath string) {
 	 db.dbmap = &gorp.DbMap{Db: sqlDb, Dialect: gorp.SqliteDialect{}}
 	 users := db.dbmap.AddTableWithName(User{}, "users").SetKeys(true, "Id")
 	 users.ColMap("Username").SetUnique(true)
-	 db.dbmap.AddTableWithName(UserChat{}, "user_chats").SetKeys(false, "UserId", "ChatUid")
-	 db.dbmap.AddTableWithName(Chat{}, "chats")
+	db.dbmap.AddTableWithName(UserChat{}, "user_chats").SetKeys(false, "UserId", "ChatUid")
+	db.dbmap.AddTableWithName(Chat{}, "chats")
+	db.dbmap.AddTableWithName(ChatMessage{}, "messages").SetKeys(false)
 
 	 err = db.dbmap.CreateTablesIfNotExists()
 	 checkErr(err, "Create tables failed")
@@ -85,8 +87,15 @@ func (db *Db) SelectUserChats(username string) ([]string, error) {
 }
 
 func (db *Db) InsertMessage(msg ChatMessage) error {
-	err := db.Insert(&msg);
+	msg.CreatedAt = time.Now().UnixNano()
+	err := db.dbmap.Insert(&msg)
 	return err
+}
+
+func (db *Db) SelectMessagesByChat(chatUid string) ([]ChatMessage, error) {
+	var messages []ChatMessage
+	_, err := db.dbmap.Select(&messages, "select * from messages where ChatUid=? order by CreatedAt", chatUid)
+	return messages, err
 }
 
 func checkErr(err error, msg string) {

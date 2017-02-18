@@ -30,7 +30,7 @@
       <button class="btn" @click="createChat()">Create Chat</button>
     </ul>
      <button data-activates="slide-out" class="button-collapse right"><i class="material-icons">chat</i>Show chats</button>
-    <h3 class="center-align" v-if="activeChat.uid">Chat with <span v-for="p in activeChat.participants">{{p}} </span></h3>
+    <h3 class="center-align" v-if="activeChat.uid">Chat with <span v-for="p in activeChat.participants">{{p}} |</span></h3>
     <div class="row" v-if="joined && activeChat.uid">
         <div class="col s12">
             <div class="card horizontal">
