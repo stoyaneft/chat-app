@@ -241,7 +241,7 @@ func checkErr(err error, msg string) {
 }
 
 func main() {
-	fs := http.FileServer(http.Dir("public"))
+	fs := http.FileServer(http.Dir("client/web/public"))
 	http.Handle("/", fs)
 	http.HandleFunc("/login/", loginHandler)
 	http.HandleFunc("/ws", handleConnections)
