@@ -23,6 +23,17 @@ type ChatInfo struct {
 	Messages     []db.ChatMessage
 }
 
+type message string
+
+const (
+	RegistrationMessage  message = "registration"
+	LoginMessage         message = "login"
+	CreateChatMessage    message = "createChat"
+	ChatSelectionMessage message = "chatSelection"
+	AddUserMessage       message = "addUser"
+	SendMessage          message = "sendMessage"
+)
+
 var chats = make(map[string]Chat) // {chatUid: Chat}
 var users = make(map[string]*websocket.Conn)
 
@@ -34,7 +45,7 @@ type Message struct {
 	Username     string     `json:"username"`
 	Password     string     `json:"password"`
 	Message      string     `json:"message"`
-	Type         string     `json:"type"`
+	Type         message    `json:"type"`
 	ChatUid      string     `json:"chatUid"`
 	Participants []string   `json:"participants"`
 	Chats        []ChatInfo `json:"chats"`
@@ -43,28 +54,30 @@ type Message struct {
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		checkErr(err, "Could not upgrade to websockets")
+		log.Fatalln("could not upgrade to websockets")
 	}
 	defer ws.Close()
+
 	for {
 		var msg Message
 		err := ws.ReadJSON(&msg)
 		if err != nil {
-			log.Printf("error: %v", err)
+			log.Printf("can not parse ws message to JSON: %v", err)
 			break
 		}
+
 		switch msg.Type {
-		case "registration":
+		case RegistrationMessage:
 			handleRegistration(msg, ws)
-		case "login":
+		case LoginMessage:
 			handleLogin(msg, ws)
-		case "createChat":
+		case CreateChatMessage:
 			handleCreateChat(msg, ws)
-		case "chatSelection":
+		case ChatSelectionMessage:
 			handleChatSelection(msg, ws)
-		case "addUser":
+		case AddUserMessage:
 			handleAddUser(msg, ws)
-		case "sendMessage":
+		case SendMessage:
 			handleSendMessage(msg)
 		}
 	}
@@ -228,15 +241,15 @@ func checkErr(err error, msg string) {
 }
 
 func main() {
-	fs := http.FileServer(http.Dir("./public"))
+	fs := http.FileServer(http.Dir("public"))
 	http.Handle("/", fs)
 	http.HandleFunc("/login/", loginHandler)
 	http.HandleFunc("/ws", handleConnections)
 	dbx.Init("db/chat.db")
 
-	log.Println("http server started on :8001")
+	log.Println("http server started on port 8001")
 	err := http.ListenAndServe(":8001", nil)
 	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		log.Fatalln("ListenAndServe: ", err)
 	}
 }

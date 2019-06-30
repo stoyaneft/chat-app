@@ -65,7 +65,7 @@ new Vue({
             }));
         },
         onRegistrationSuccessful: function() {
-            window.location.href = '/login';
+            window.location.href = '/login.html';
         },
 
         gravatarURL: function(email) {
