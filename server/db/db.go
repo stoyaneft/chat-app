@@ -9,29 +9,7 @@ import (
 	"gopkg.in/gorp.v1"
 )
 
-type User struct {
-	Id       int64
-	Username string
-	Email    string
-	Password []byte
-}
 
-type UserChat struct {
-	UserId  int64
-	ChatUid string
-}
-
-type Chat struct {
-	Uid  string
-	Name string
-}
-
-type ChatMessage struct {
-	Username  string
-	ChatUid   string
-	Message   string
-	CreatedAt int64
-}
 
 type Db struct{ dbmap *gorp.DbMap }
 

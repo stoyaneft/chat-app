@@ -11,45 +11,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type Chat struct {
-	Uid            string
-	Users          map[*websocket.Conn]bool
-	BroadcastQueue chan Message
-}
-
-type ChatInfo struct {
-	Uid          string
-	Participants []string
-	Messages     []db.ChatMessage
-}
-
-type message string
-
-const (
-	RegistrationMessage  message = "registration"
-	LoginMessage         message = "login"
-	CreateChatMessage    message = "createChat"
-	ChatSelectionMessage message = "chatSelection"
-	AddUserMessage       message = "addUser"
-	SendMessage          message = "sendMessage"
-)
-
 var chats = make(map[string]Chat) // {chatUid: Chat}
 var users = make(map[string]*websocket.Conn)
 
 var upgrader = websocket.Upgrader{}
 var dbx = &db.Db{}
-
-type Message struct {
-	Email        string     `json:"email"`
-	Username     string     `json:"username"`
-	Password     string     `json:"password"`
-	Message      string     `json:"message"`
-	Type         message    `json:"type"`
-	ChatUid      string     `json:"chatUid"`
-	Participants []string   `json:"participants"`
-	Chats        []ChatInfo `json:"chats"`
-}
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
